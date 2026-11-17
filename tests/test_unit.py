@@ -11,12 +11,16 @@ def storage(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", db)
     monkeypatch.setenv("DNS_ZONE", "internal.local")
     monkeypatch.setenv("MAX_RECORDS", "8")
-    # Import fresh so settings + storage bind to the temp env.
+    # Import fresh so settings + storage bind to the temp env. Reload
+    # config BEFORE storage is (first) imported: another test module may
+    # already have imported app.config with the default environment.
     import importlib
 
-    from app import config, storage as storage_mod
+    from app import config
 
     importlib.reload(config)
+    from app import storage as storage_mod
+
     importlib.reload(storage_mod)
     yield storage_mod
     storage_mod.storage._connect().close()

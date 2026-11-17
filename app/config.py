@@ -37,6 +37,12 @@ class Settings:
     sync_interval: float = float(_env_int("SYNC_INTERVAL", 5))
     http_timeout: float = float(_env_int("HTTP_TIMEOUT", 10))
     max_records: int = _env_int("MAX_RECORDS", 8)
+    # Max CIDR -> IPv4 site-selection rules allowed per record name.
+    max_view_rules: int = _env_int("MAX_VIEW_RULES", 2)
+    # Comma-separated IPs/CIDRs of recursors whose EDNS Client Subnet
+    # options are honoured. Direct clients are always located by their
+    # UDP source address; ECS from any other source is ignored.
+    trusted_ecs_resolvers: str = _env("TRUSTED_ECS_RESOLVERS", "")
 
     @property
     def is_primary(self) -> bool:

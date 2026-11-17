@@ -8,6 +8,10 @@ services:
       DB_PATH: /data/primary.db
       DNS_PORT: "5053"
       API_PORT: "8000"
+      # Recursors allowed to send EDNS Client Subnet. The compose default
+      # trusts the docker bridge range so `dig +subnet=...` from the host
+      # works out of the box; pin real recursor IPs in production.
+      TRUSTED_ECS_RESOLVERS: "172.16.0.0/12"
     ports:
       - "8080:8000"      # primary Swagger / REST
       - "5053:5053/udp"  # primary DNS
@@ -34,6 +38,7 @@ services:
       PRIMARY_API_URL: http://primary:8000
       SYNC_INTERVAL: "3"
       HTTP_TIMEOUT: "10"
+      TRUSTED_ECS_RESOLVERS: "172.16.0.0/12"
     ports:
       - "8081:8000"      # backup Swagger / REST
       - "5054:5053/udp"  # backup DNS

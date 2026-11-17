@@ -77,18 +77,30 @@ async def sync_once(client: Optional[httpx.AsyncClient] = None) -> SyncOutcome:
             upstream_serial < 1
             or not isinstance(records, list)
             or not isinstance(published_at, str)
-            or any(
-                not isinstance(r, dict)
-                or not isinstance(r.get("name"), str)
-                or not isinstance(r.get("ip"), str)
-                for r in records
-            )
         ):
             err = "malformed zone payload from primary"
             storage.update_sync_state("failed", err, upstream_serial)
             return SyncOutcome(
                 "failed", False, local_serial, upstream_serial, err
             )
+
+        # Re-validate the whole zone with the same rules as a publish
+        # (names, IPv4, CIDR rules, limits). An invalid transfer never
+        # touches the active version.
+        from .models import ZonePayload
+
+        try:
+            validated = ZonePayload.model_validate({"records": records})
+        except Exception as exc:
+            err = f"zone payload failed validation: {exc}"
+            storage.update_sync_state("failed", err, upstream_serial)
+            log.warning("rejected invalid transfer: %s", err)
+            return SyncOutcome(
+                "failed", False, local_serial, upstream_serial, err
+            )
+        clean_records = [
+            r.model_dump() for r in validated.sorted_records()
+        ]
 
         if upstream_serial <= local_serial:
             # Late/old transfer: must never roll back an active version.
@@ -106,7 +118,7 @@ async def sync_once(client: Optional[httpx.AsyncClient] = None) -> SyncOutcome:
         # Apply the complete new version in one atomic transaction.
         applied = storage.commit_version(
             upstream_serial,
-            [{"name": r["name"], "ip": r["ip"]} for r in records],
+            clean_records,
             published_at,
         )
         if applied:

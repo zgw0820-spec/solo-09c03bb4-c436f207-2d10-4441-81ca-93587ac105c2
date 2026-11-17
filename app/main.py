@@ -77,11 +77,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Primary/Backup DNS for fixed intranet zone",
-    version="1.0.0",
+    version="2.0.0",
     description=(
-        "Primary accepts a complete zone (up to 8 A records); the backup "
-        "pulls whole versions over HTTP and answers A queries over UDP. "
-        "Every answer uses one immutable version."
+        "Primary accepts a complete zone (up to 8 A records); each record "
+        "carries a default IPv4 plus up to 2 CIDR→IPv4 site-selection "
+        "rules (longest-prefix match). The backup pulls whole versions "
+        "over HTTP and answers A queries over UDP. Direct UDP clients are "
+        "located by source address; EDNS Client Subnet is honoured only "
+        "from configured trusted recursors. Every answer uses one "
+        "immutable version."
     ),
     lifespan=lifespan,
 )
@@ -110,7 +114,12 @@ def get_zone() -> ZoneOut:
     tags=["primary"],
 )
 def publish_zone(payload: ZonePayload) -> PublishResult:
-    """Replace the whole zone. The serial increments only on success."""
+    """Replace the whole zone. The serial increments only on success.
+
+    Each record: ``name`` + default ``ip`` + optional ``rules``
+    (CIDR→IPv4, at most 2 per name). An invalid payload is rejected
+    wholesale and leaves the published zone untouched.
+    """
     if not settings.is_primary:
         raise HTTPException(
             status_code=403,
